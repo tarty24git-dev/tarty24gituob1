@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Custom Query & Dynamic Reporting Console</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8fafc; min-height: 100vh; display: flex; flex-direction: column; }
+    </style>
+</head>
+<body>
+
+<div th:replace="~{layout/navbar :: navbar}"></div>
+
+<div class="container-fluid px-4 flex-grow-1">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="fw-bold text-dark mb-0"><i class="bi bi-table text-primary me-2"></i>Custom Query & Online Report Builder</h2>
+            <p class="text-muted small mb-0">Construct dynamic queries against database schema tables, filter attributes, and schedule automated reporting.</p>
+        </div>
+        <button class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#saveReportModal"><i class="bi bi-bookmark-plus me-1"></i> Save Report Config</button>
+    </div>
+
+    <div class="row g-4 mb-4">
+        <!-- Builder Controls -->
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm p-3">
+                <h5 class="fw-bold mb-3 text-dark"><i class="bi bi-sliders text-primary me-2"></i>Query Configuration</h5>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Target Database Table</label>
+                    <select id="tableNameSelect" class="form-select" onchange="loadTableColumns(this.value)">
+                        <option value="">-- Select Table --</option>
+                        <option th:each="t : ${tables}" th:value="${t}" th:text="${t}">USERS</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Select Fields / Columns</label>
+                    <select id="fieldsSelect" class="form-select" multiple size="5"></select>
+                    <small class="text-muted">Hold Ctrl/Cmd to choose multiple fields.</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Filter Condition (SQL WHERE clause)</label>
+                    <input type="text" id="filterConditionInput" class="form-control" placeholder="e.g. LOCKED = 0 AND ROLE = 'ADMIN'">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Sort By Column</label>
+                    <input type="text" id="sortByInput" class="form-control" placeholder="e.g. CREATED_AT DESC">
+                </div>
+
+                <button class="btn btn-primary w-100 py-2 fw-bold" onclick="runReportQuery()"><i class="bi bi-play-fill me-1"></i> Run Query</button>
+            </div>
+        </div>
+
+        <!-- Query Output Grid -->
+        <div class="col-md-8">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                    <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-grid-3x3-gap-fill text-primary me-2"></i>Report Result View</h5>
+                    <span class="badge bg-secondary" id="recordCountBadge">0 Records</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 500px;">
+                        <table class="table table-hover align-middle mb-0" id="reportResultTable">
+                            <thead class="table-light sticky-top">
+                                <tr><th class="text-center text-muted p-4">Select table and fields to preview output.</th></tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="saveReportModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-bookmark-plus text-primary me-2"></i>Save Report Template</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Report Name</label>
+                    <input type="text" id="saveReportName" class="form-control" required placeholder="Daily Audit Summary">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Description</label>
+                    <input type="text" id="saveReportDesc" class="form-control" placeholder="Generates daily list of active administrator events">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">CRON Schedule Expression (Optional)</label>
+                    <input type="text" id="saveCron" class="form-control" placeholder="0 0 * * * * (hourly)">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveReportConfig()">Save Report</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/footer :: footer}"></div>
+
+<script>
+    function loadTableColumns(tableName) {
+        if (!tableName) return;
+        fetch('/api/reports/tables/' + tableName + '/columns')
+            .then(res => res.json())
+            .then(cols => {
+                const select = document.getElementById('fieldsSelect');
+                select.innerHTML = '';
+                Object.keys(cols).forEach(col => {
+                    select.add(new Option(`${col} (${cols[col]})`, col));
+                });
+            });
+    }
+
+    function runReportQuery() {
+        const tableName = document.getElementById('tableNameSelect').value;
+        const fields = Array.from(document.getElementById('fieldsSelect').selectedOptions).map(o => o.value);
+        const filterCondition = document.getElementById('filterConditionInput').value;
+        const sortBy = document.getElementById('sortByInput').value;
+
+        if (!tableName) { alert('Please select a target table.'); return; }
+
+        fetch('/api/reports/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tableName, fields, filterCondition, sortBy, limit: 200 })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) { alert(data.error); return; }
+            renderGrid(data);
+        });
+    }
+
+    function renderGrid(data) {
+        const table = document.getElementById('reportResultTable');
+        const thead = table.querySelector('thead');
+        const tbody = table.querySelector('tbody');
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+
+        document.getElementById('recordCountBadge').innerText = data.length + ' Records';
+
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted p-4">No data returned for query.</td></tr>';
+            return;
+        }
+
+        const headers = Object.keys(data[0]);
+        let headerHtml = '<tr>';
+        headers.forEach(h => headerHtml += `<th>${h}</th>`);
+        headerHtml += '</tr>';
+        thead.innerHTML = headerHtml;
+
+        data.forEach(row => {
+            let rowHtml = '<tr>';
+            headers.forEach(h => rowHtml += `<td>${row[h] !== null ? row[h] : ''}</td>`);
+            rowHtml += '</tr>';
+            tbody.innerHTML += rowHtml;
+        });
+    }
+
+    function saveReportConfig() {
+        const reportName = document.getElementById('saveReportName').value;
+        const description = document.getElementById('saveReportDesc').value;
+        const cronExpression = document.getElementById('saveCron').value;
+        const targetTable = document.getElementById('tableNameSelect').value;
+        const fields = Array.from(document.getElementById('fieldsSelect').selectedOptions).map(o => o.value).join(',');
+        const filterConditions = document.getElementById('filterConditionInput').value;
+        const sortBy = document.getElementById('sortByInput').value;
+
+        fetch('/api/reports/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reportName, description, cronExpression, targetTable, selectedFields: fields, filterConditions, sortBy })
+        })
+        .then(res => res.json())
+        .then(data => {
+            alert('Report config saved successfully!');
+            bootstrap.Modal.getInstance(document.getElementById('saveReportModal')).hide();
+        });
+    }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

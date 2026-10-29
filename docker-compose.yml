@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  datamatch-app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - APP_NAME=DataMatch Studio
+      - SPRING_PROFILES_ACTIVE=postgres
+      - PG_HOST=postgres-db
+      - PG_PORT=5432
+      - PG_DB=datamatchdb
+      - PG_USER=postgres
+      - PG_PASSWORD=postgres
+    depends_on:
+      - postgres-db
+
+  postgres-db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=datamatchdb
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    ports:
+      - "5432:5432"

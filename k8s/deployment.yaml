@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: datamatch-deployment
+  labels:
+    app: datamatch
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: datamatch
+  template:
+    metadata:
+      labels:
+        app: datamatch
+    spec:
+      containers:
+      - name: datamatch
+        image: cth/datamatch:1.0.0
+        ports:
+        - containerPort: 8080
+        envFrom:
+        - configMapRef:
+            name: datamatch-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: datamatch-service
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: datamatch
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: datamatch-config
+data:
+  APP_NAME: "DataMatch Enterprise Suite"
+  SPRING_PROFILES_ACTIVE: "h2"

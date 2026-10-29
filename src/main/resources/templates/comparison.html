@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>CSV / Excel Data Comparison Engine</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8fafc; min-height: 100vh; display: flex; flex-direction: column; }
+        .drop-zone { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 30px; text-align: center; background: #ffffff; cursor: pointer; transition: all 0.2s; }
+        .drop-zone:hover { border-color: #3b82f6; background: #f0f9ff; }
+    </style>
+</head>
+<body>
+
+<div th:replace="~{layout/navbar :: navbar}"></div>
+
+<div class="container-fluid px-4 flex-grow-1">
+    <div class="mb-4">
+        <h2 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-diff text-primary me-2"></i>CSV & Excel Data Comparison Engine</h2>
+        <p class="text-muted small mb-0">Select two CSV or Excel files, configure key columns and attribute mappings to perform deep record comparison.</p>
+    </div>
+
+    <!-- Step 1: File Selection -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3">
+            <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-1-circle-fill text-primary me-2"></i>Step 1: Upload Files</h5>
+        </div>
+        <div class="card-body">
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="drop-zone" onclick="document.getElementById('file1Input').click();">
+                            <i class="bi bi-file-earmark-spreadsheet display-4 text-primary mb-2"></i>
+                            <h6 class="fw-bold mb-1">Primary File A (CSV / Excel)</h6>
+                            <p class="text-muted small mb-0" id="file1Name">Click or drag & drop file here</p>
+                            <input type="file" id="file1Input" name="file1" accept=".csv, .xlsx, .xls" class="d-none" onchange="updateFileName(this, 'file1Name')">
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="drop-zone" onclick="document.getElementById('file2Input').click();">
+                            <i class="bi bi-file-earmark-spreadsheet display-4 text-success mb-2"></i>
+                            <h6 class="fw-bold mb-1">Comparison File B (CSV / Excel)</h6>
+                            <p class="text-muted small mb-0" id="file2Name">Click or drag & drop file here</p>
+                            <input type="file" id="file2Input" name="file2" accept=".csv, .xlsx, .xls" class="d-none" onchange="updateFileName(this, 'file2Name')">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="text-center mt-4">
+                    <button type="button" class="btn btn-primary px-4 py-2 fw-bold" onclick="inspectHeaders()"><i class="bi bi-search me-1"></i> Inspect & Map Columns</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Step 2: Key & Field Mapping (Hidden Initially) -->
+    <div class="card border-0 shadow-sm mb-4 d-none" id="mappingCard">
+        <div class="card-header bg-white py-3">
+            <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-2-circle-fill text-primary me-2"></i>Step 2: Configure Comparison Keys & Attributes</h5>
+        </div>
+        <div class="card-body">
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Primary Key Columns (Unique Identifiers)</label>
+                    <select id="keyColumnsSelect" class="form-select" multiple size="5"></select>
+                    <small class="text-muted">Hold Ctrl/Cmd to select composite key columns.</small>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label fw-bold">Attribute Columns to Compare</label>
+                    <select id="compareColumnsSelect" class="form-select" multiple size="5"></select>
+                    <small class="text-muted">Hold Ctrl/Cmd to select attribute fields to cross-verify.</small>
+                </div>
+            </div>
+
+            <div class="text-center mt-4">
+                <button type="button" class="btn btn-success px-5 py-2 fw-bold shadow-sm" onclick="runComparison()"><i class="bi bi-play-fill me-1"></i> Execute Data Comparison</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Step 3: Comparison Results -->
+    <div class="card border-0 shadow-sm mb-4 d-none" id="resultsCard">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-bar-chart-fill text-primary me-2"></i>Comparison Summary & Results</h5>
+            <button class="btn btn-outline-secondary btn-sm" onclick="exportCurrentView()"><i class="bi bi-download me-1"></i> Export Active Tab to CSV</button>
+        </div>
+        <div class="card-body">
+            <div class="row g-3 text-center mb-4">
+                <div class="col-md-3"><div class="p-3 border rounded bg-light"><div class="text-muted small">Total File A Rows</div><h3 class="fw-bold mb-0" id="statFile1">0</h3></div></div>
+                <div class="col-md-3"><div class="p-3 border rounded bg-light"><div class="text-muted small">Total File B Rows</div><h3 class="fw-bold mb-0" id="statFile2">0</h3></div></div>
+                <div class="col-md-2"><div class="p-3 border rounded bg-success-subtle text-success"><div class="small">Matched Rows</div><h3 class="fw-bold mb-0" id="statMatched">0</h3></div></div>
+                <div class="col-md-2"><div class="p-3 border rounded bg-warning-subtle text-warning"><div class="small">Mismatched Rows</div><h3 class="fw-bold mb-0" id="statMismatched">0</h3></div></div>
+                <div class="col-md-2"><div class="p-3 border rounded bg-danger-subtle text-danger"><div class="small">Unmatched Rows</div><h3 class="fw-bold mb-0" id="statUnmatched">0</h3></div></div>
+            </div>
+
+            <!-- Tabs -->
+            <ul class="nav nav-tabs" id="resultTabs" role="tablist">
+                <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#matchedTab">Matched Records</button></li>
+                <li class="nav-item"><button class="nav-link text-warning" data-bs-toggle="tab" data-bs-target="#mismatchedTab">Mismatched Records</button></li>
+                <li class="nav-item"><button class="nav-link text-danger" data-bs-toggle="tab" data-bs-target="#unmatched1Tab">Unmatched (Only in File A)</button></li>
+                <li class="nav-item"><button class="nav-link text-danger" data-bs-toggle="tab" data-bs-target="#unmatched2Tab">Unmatched (Only in File B)</button></li>
+            </ul>
+
+            <div class="tab-content pt-3" id="resultTabContent">
+                <div class="tab-pane fade show active" id="matchedTab"><div class="table-responsive"><table class="table table-hover table-sm align-middle" id="matchedTable"><thead></thead><tbody></tbody></table></div></div>
+                <div class="tab-pane fade" id="mismatchedTab"><div class="table-responsive"><table class="table table-hover table-sm align-middle" id="mismatchedTable"><thead></thead><tbody></tbody></table></div></div>
+                <div class="tab-pane fade" id="unmatched1Tab"><div class="table-responsive"><table class="table table-hover table-sm align-middle" id="unmatched1Table"><thead></thead><tbody></tbody></table></div></div>
+                <div class="tab-pane fade" id="unmatched2Tab"><div class="table-responsive"><table class="table table-hover table-sm align-middle" id="unmatched2Table"><thead></thead><tbody></tbody></table></div></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div th:replace="~{layout/footer :: footer}"></div>
+
+<script>
+    let activeResultData = null;
+
+    function updateFileName(input, targetId) {
+        if (input.files && input.files[0]) {
+            document.getElementById(targetId).innerText = input.files[0].name;
+            document.getElementById(targetId).classList.add("fw-bold", "text-primary");
+        }
+    }
+
+    function inspectHeaders() {
+        const file1 = document.getElementById('file1Input').files[0];
+        const file2 = document.getElementById('file2Input').files[0];
+
+        if (!file1 || !file2) {
+            alert('Please select both Primary File A and Comparison File B.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file1', file1);
+        formData.append('file2', file2);
+
+        fetch('/api/comparison/inspect-headers', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) { alert(data.error); return; }
+
+                const keySelect = document.getElementById('keyColumnsSelect');
+                const compareSelect = document.getElementById('compareColumnsSelect');
+                keySelect.innerHTML = '';
+                compareSelect.innerHTML = '';
+
+                data.commonHeaders.forEach(col => {
+                    keySelect.add(new Option(col, col));
+                    compareSelect.add(new Option(col, col));
+                });
+
+                document.getElementById('mappingCard').classList.remove('d-none');
+            })
+            .catch(err => alert('Error inspecting files: ' + err));
+    }
+
+    function runComparison() {
+        const file1 = document.getElementById('file1Input').files[0];
+        const file2 = document.getElementById('file2Input').files[0];
+        const keyCols = Array.from(document.getElementById('keyColumnsSelect').selectedOptions).map(o => o.value);
+        const compareCols = Array.from(document.getElementById('compareColumnsSelect').selectedOptions).map(o => o.value);
+
+        if (keyCols.length === 0) {
+            alert('Please select at least one primary key column.');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file1', file1);
+        formData.append('file2', file2);
+        keyCols.forEach(k => formData.append('keyColumns', k));
+        compareCols.forEach(c => formData.append('compareColumns', c));
+
+        fetch('/api/comparison/execute', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) { alert(data.error); return; }
+                activeResultData = data;
+
+                document.getElementById('statFile1').innerText = data.totalFile1Rows;
+                document.getElementById('statFile2').innerText = data.totalFile2Rows;
+                document.getElementById('statMatched').innerText = data.matchedCount;
+                document.getElementById('statMismatched').innerText = data.mismatchedCount;
+                document.getElementById('statUnmatched').innerText = data.unmatchedFile1Count + data.unmatchedFile2Count;
+
+                renderTable('matchedTable', data.matchedRows);
+                renderTable('mismatchedTable', data.mismatchedRows);
+                renderTable('unmatched1Table', data.unmatchedFile1Rows);
+                renderTable('unmatched2Table', data.unmatchedFile2Rows);
+
+                document.getElementById('resultsCard').classList.remove('d-none');
+            })
+            .catch(err => alert('Error executing comparison: ' + err));
+    }
+
+    function renderTable(tableId, rows) {
+        const table = document.getElementById(tableId);
+        const thead = table.querySelector('thead');
+        const tbody = table.querySelector('tbody');
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+
+        if (!rows || rows.length === 0) {
+            tbody.innerHTML = '<tr><td class="text-center text-muted p-4">No records found.</td></tr>';
+            return;
+        }
+
+        const headers = Object.keys(rows[0]);
+        let headerHtml = '<tr>';
+        headers.forEach(h => headerHtml += `<th>${h}</th>`);
+        headerHtml += '</tr>';
+        thead.innerHTML = headerHtml;
+
+        rows.forEach(row => {
+            let rowHtml = '<tr>';
+            headers.forEach(h => rowHtml += `<td>${row[h] || ''}</td>`);
+            rowHtml += '</tr>';
+            tbody.innerHTML += rowHtml;
+        });
+    }
+
+    function exportCurrentView() {
+        if (!activeResultData) return;
+        const activeTab = document.querySelector('#resultTabs .active').getAttribute('data-bs-target');
+        let rows = [];
+        let name = "matched_report";
+
+        if (activeTab === '#matchedTab') rows = activeResultData.matchedRows;
+        else if (activeTab === '#mismatchedTab') { rows = activeResultData.mismatchedRows; name = "mismatched_report"; }
+        else if (activeTab === '#unmatched1Tab') { rows = activeResultData.unmatchedFile1Rows; name = "unmatched_fileA_report"; }
+        else if (activeTab === '#unmatched2Tab') { rows = activeResultData.unmatchedFile2Rows; name = "unmatched_fileB_report"; }
+
+        fetch('/api/comparison/export-csv', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rows: rows, reportType: name })
+        })
+        .then(res => res.blob())
+        .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = name + '.csv';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        });
+    }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
