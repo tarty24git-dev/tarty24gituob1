@@ -1,0 +1,141 @@
+spring:
+  application:
+    name: ${APP_NAME:DataMatch Studio}
+
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:h2} # Default to h2 for easy instant demo, switchable to db2, db2as400, postgres, oracle, sqlserver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+
+  thymeleaf:
+    cache: false
+    mode: HTML
+    encoding: UTF-8
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+
+server:
+  port: ${PORT:8080}
+  servlet:
+    context-path: /
+
+# Application-specific custom properties
+app:
+  name: ${APP_NAME:DataMatch Studio}
+  security:
+    ldap:
+      enabled: ${LDAP_ENABLED:false}
+      url: ${LDAP_URL:ldap://localhost:389/dc=cth,dc=com}
+      base-dn: ${LDAP_BASE_DN:dc=cth,dc=com}
+      user-dn-pattern: ${LDAP_USER_DN_PATTERN:uid={0},ou=people}
+    verification:
+      enabled: ${VERIFICATION_ENABLED:false} # Toggle for SMS/Email verification on account creation
+      method: ${VERIFICATION_METHOD:EMAIL} # EMAIL or SMS
+  password:
+    default-admin: Qwerty123$
+    expiration-days: 90
+    min-length: 8
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+
+---
+# H2 In-Memory Profile (Default Demo)
+spring:
+  config:
+    activate:
+      on-profile: h2
+  datasource:
+    url: jdbc:h2:mem:datamatchdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+---
+# IBM DB2 LUW Profile
+spring:
+  config:
+    activate:
+      on-profile: db2
+  datasource:
+    url: jdbc:db2://${DB2_HOST:localhost}:${DB2_PORT:50000}/${DB2_DB:DATAMATCHDB}
+    driver-class-name: com.ibm.db2.jcc.DB2Driver
+    username: ${DB2_USER:db2inst1}
+    password: ${DB2_PASSWORD:password}
+  jpa:
+    database-platform: org.hibernate.dialect.DB2Dialect
+
+---
+# IBM DB2 for AS/400 (IBM i) Profile
+spring:
+  config:
+    activate:
+      on-profile: db2as400
+  datasource:
+    url: jdbc:as400://${AS400_HOST:localhost}/${AS400_LIB:DATAMATCHLIB};naming=sql;errors=full
+    driver-class-name: com.ibm.as400.access.AS400JDBCDriver
+    username: ${AS400_USER:QUSER}
+    password: ${AS400_PASSWORD:password}
+  jpa:
+    database-platform: org.hibernate.dialect.DB2iDialect
+
+---
+# PostgreSQL Profile
+spring:
+  config:
+    activate:
+      on-profile: postgres
+  datasource:
+    url: jdbc:postgresql://${PG_HOST:localhost}:${PG_PORT:5432}/${PG_DB:datamatchdb}
+    driver-class-name: org.postgresql.Driver
+    username: ${PG_USER:postgres}
+    password: ${PG_PASSWORD:postgres}
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+---
+# Oracle Profile
+spring:
+  config:
+    activate:
+      on-profile: oracle
+  datasource:
+    url: jdbc:oracle:thin:@//${ORACLE_HOST:localhost}:${ORACLE_PORT:1521}/${ORACLE_SERVICE:ORCLCDB}
+    driver-class-name: oracle.jdbc.OracleDriver
+    username: ${ORACLE_USER:datamatch}
+    password: ${ORACLE_PASSWORD:password}
+  jpa:
+    database-platform: org.hibernate.dialect.OracleDialect
+
+---
+# Microsoft SQL Server Profile
+spring:
+  config:
+    activate:
+      on-profile: sqlserver
+  datasource:
+    url: jdbc:sqlserver://${SQLSERVER_HOST:localhost}:${SQLSERVER_PORT:1433};databaseName=${SQLSERVER_DB:datamatchdb};encrypt=false
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    username: ${SQLSERVER_USER:sa}
+    password: ${SQLSERVER_PASSWORD:Password123!}
+  jpa:
+    database-platform: org.hibernate.dialect.SQLServerDialect

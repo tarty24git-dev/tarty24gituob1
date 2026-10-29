@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - DataMatch Studio</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); min-height: 100vh; display: flex; align-items: center; }
+        .login-card { background: rgba(255, 255, 255, 0.95); border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.3); }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-5">
+            <div class="card login-card p-4 p-md-5">
+                <div class="text-center mb-4">
+                    <i class="bi bi-diagram-3-fill text-primary display-4"></i>
+                    <h3 class="fw-bold mt-2 text-dark" th:text="${appName}">DataMatch Studio</h3>
+                    <p class="text-muted small">Enterprise CSV/Excel Matching & Query Reporting Engine</p>
+                </div>
+
+                <div th:if="${errorMessage}" class="alert alert-danger py-2 small" th:text="${errorMessage}"></div>
+                <div th:if="${successMessage}" class="alert alert-success py-2 small" th:text="${successMessage}"></div>
+
+                <form th:action="@{/login}" method="post">
+                    <div class="mb-3">
+                        <label class="form-label font-weight-bold text-dark">Username</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-person"></i></span>
+                            <input type="text" name="username" class="form-control" placeholder="Enter username (default: admin)" required>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label font-weight-bold text-dark">Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                            <input type="password" name="password" class="form-control" placeholder="Enter password (default: Qwerty123$)" required>
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <span class="badge bg-secondary p-2" th:text="${ldapEnabled ? 'Auth Mode: Active Directory (LDAP)' : 'Auth Mode: DB Security'}">Auth Mode: DB Security</span>
+                        <a href="#" class="text-decoration-none small" data-bs-toggle="modal" data-bs-target="#forgotModal">Forgot Password?</a>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow-sm">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                    </button>
+                </form>
+
+                <div class="mt-4 text-center border-top pt-3">
+                    <p class="small text-muted mb-0">Need an account? Contact system administrator or register in User Management.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal -->
+<div class="modal fade" id="forgotModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-info-circle text-primary me-2"></i>Password Reset Policy</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-content p-3">
+                <p class="small text-muted mb-0">Default administrator credentials are <strong>admin / Qwerty123$</strong>. Passwords expire every 90 days and require at least 8 characters with uppercase, lowercase, numbers, and special characters.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
